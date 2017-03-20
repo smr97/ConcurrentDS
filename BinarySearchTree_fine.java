@@ -3,104 +3,79 @@ import java.lang.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.*;
 /*	This is a fine grained lazy locking implementation of a binary search tree.
 */
-public class BinarySearchTree
+class BinarySearchTree
 {
 	private Node root;
 	public BinarySearchTree()
 	{
 		root = new Node();
+		root.data = 50;
 	}
 	public boolean insert(int data)
 	{
-		root.lock();		//can be made reader??
-		if(root.data == -1)
-		{
-			root.data = data;
-			root.unlock();
-			return;
-		}
-		root.unlock();
-		//traversal for insert
-		while(true)
-		{
+		if(data<0)
+			return false;
+			try{
+			//traversal for insert
 			Node temp = root;
 			while(true)
 			{
-				if(temp.rightChild==null&&temp.leftChild==null)
-				{
-					break;
-				}
-				if(temp.rightChild==null)
-				{
-					temp = temp.leftChild;
-					continue;
-				}
-				if(temp.leftChild==null)
-				{
-					temp = temp.leftChild;
-					continue;
-				}
-				if(data<temp.data)
-				{
-					temp = temp.leftChild;
-					continue;
-				}
 				if(data>temp.data)
 				{
-					temp = temp.rightChild;
-					continue;
-				}
-				else
-				{
-					return false;
-				}
-			}
-			//temp is a leaf, insert after it if it has data, else insert into it.
-			temp.lock();
-				//temp is a leaf and holds no data.
-				if(temp.data==-1&&temp.rightChild==null&&temp.leftChild==null)
-				{
-					temp.data = input;
-					temp.unlock();
-					return true;
-				}
-				//temp is no longer a leaf, retraverse. <<Starvation>>
-				else if(temp.rightChild!=null||temp.leftChild!=null)
-				{
-					temp.unlock();
-					continue;
-				}
-				//temp is a leaf with data
-				else
-				{
-					Node ins = new Node();
-					ins.data = input;
-					ins.parent = temp;
-					if(input<temp.data)
+					if(temp.rightChild!=null)
 					{
-						
-						temp.leftChild = ins;
-						temp.unlock();
-						return true;
-					}
-					if(input>temp.data)
-					{
-						temp.rightChild = ins;
-						temp.unlock();
-						return true;
+						temp = temp.rightChild;
+						continue;
 					}
 					else
 					{
+						temp.lock();
+						if(temp.rightChild!=null)
+						{
+							temp.unlock();
+							continue;
+						}
+						Node ins = new Node();
+						ins.data = data;
+						temp.rightChild= ins;
 						temp.unlock();
-						return false;
+						return true;
 					}
 				}
+				else if(data<temp.data)
+				{
+					if(temp.leftChild!=null)
+					{
+						temp = temp.leftChild;
+						continue;
+					}
+					else
+					{
+						//temp is a leaf or a node with one child null, insert after it.
+						temp.lock();
+						//temp is a leaf with data or a node with only one subtree.
+						if(temp.leftChild!=null)
+						{
+							temp.unlock();
+							continue;
+						}
+						Node ins = new Node();
+						ins.data = data;
+						temp.leftChild= ins;
+						temp.unlock();
+						return true;
+					}
+				}
+				else
+					return false;
+			}
 		}
+			catch(NullPointerException e){System.out.println("Insert NUll"); return false;}
 	}
 	/*traversal rules: 
 	*data = -1 will only be visible in case we have reached an empty leaf. (see remove stage 2)
@@ -109,16 +84,12 @@ public class BinarySearchTree
 	private Node find(int data)
 	{
 		Node itr = root;
+		try{
 		while(itr!=null)
 		{
 			if(itr.data==data)
 			{
 				return itr;
-			}
-			if(itr.r1==true)
-			{
-				itr = itr.rightChild;
-				continue;
 			}
 			if(itr.leftChild==null)
 			{
@@ -145,211 +116,293 @@ public class BinarySearchTree
 			else if(data>itr.data)
 				itr = itr.rightChild;
 		}
+		}
+		catch(NullPointerException e)
+		{
+			return null;
+		}
 		return null;
 	}
-	private void removeRoot()
-	{
-		root.lock();
-			Node left = root.leftChild;
-			if(left == null)
-			{
-				if(root.rightChild == null)
-				{
-					root.data = -1;
-					return;
-				}
-				root.data = -1;
-				root = root.rightChild;
-				return;
-			}
-			Node right = root.rightChild;
-			if(right == null)
-			{
-				root.data = -1;
-				root = root.leftChild;
-				return;
-			}
-		root.unlock();
-		Node itr = right;
-		while(itr.leftChild!=null)
-		{
-			if(itr.leftChild.data==-1)
-			{
-				itr = itr.rightChild;
-				continue;
-			}
-			itr = itr.leftChild;
-		}
-		//link left subtree of the root to leftmost leaf of right subtree of root
-		itr.lock();
-				root.leftChild.lock();
-					itr.leftChild = root.leftChild;
-					root.leftChild.parent = itr;
-				root.leftChild.unlock();
-		itr.unlock();
-		//move root reference
-		root = root.rightChild;
-	}
+
 	public boolean remove(int data)
 	{
 		if(data == root.data)
 		{
-			removeRoot();
-			return true;
+			return false;
 		}
-		
-		while(true)
+		outer: while(true)
 		{
-			//traverse and find the node to be removed.
-			Node itr = find(data);
-			if(itr==null)
-				return false;
-			//removal for less than 2 subtrees.
-			itr.parent.lock();
-			itr.lock();
-				if(itr.leftChild==null&&itr.rightChild==null)
+			Node parent = root;
+				Node itr = root;
+				//traversal
+				while(itr!=null)
 				{
-					itr.data = -1;
-					itr.unlock();
-					itr.parent.unlock();
-					return true;
-				}
-				if(itr.rightChild==null)
-				{
-						if(itr.parent.leftChild==itr)
+					if(data>itr.data)
+					{
+						if(itr.rightChild!=null)
 						{
-							itr.parent.leftChild = itr.leftChild;
+							parent = itr;
+							itr = itr.rightChild;
 						}
 						else
 						{
-							itr.parent.rightChild = itr.leftChild;
+							return false;
 						}
-					itr.data = -1;
-					itr.unlock();
-					itr.parent.unlock();
-					return true;
-				}
-				if(itr.leftChild==null)
-				{
-					itr.parent.lock();
-						if(itr.parent.leftChild==itr)
+					}
+					else if(data<itr.data)
+					{
+						if(itr.leftChild!=null)
 						{
-							itr.parent.leftChild = itr.rightChild;
+							parent = itr;
+							itr = itr.leftChild;
 						}
 						else
 						{
-							itr.parent.rightChild = itr.rightChild;
+							return false;
 						}
-					itr.data = -1;
-					itr.unlock();
-					itr.parent.unlock();
-					return true;
+					}
+					else if(data==itr.data)
+					{
+						/*itr is to be removed and parent is its parent*/
+						parent.lock();
+						itr.lock();
+						break;
+					}
 				}
-				if(itr.leftChild.data==-1&&itr.rightChild.data==-1)
-				{
-					itr.parent.lock();
-						if(itr.parent.leftChild==itr)
-						{
-							itr.parent.leftChild = itr.rightChild;
-						}
+				//if(itr == null)
+				//	return false;
+					if(itr.rightChild==null&&itr.leftChild==null)
+					{
+						if(parent.leftChild == itr)
+							parent.leftChild = null;
+						else if(parent.rightChild == itr)
+							parent.rightChild = null;
 						else
 						{
-							itr.parent.rightChild = itr.rightChild;
+							itr.unlock();
+							parent.unlock();
+							return false;
 						}
-					itr.data = -1;
-					itr.unlock();
-					itr.parent.unlock();
-					return true;
-				}
-			itr.unlock();
-			//find the leftmost leaf
-			Node temp = itr.rightChild;
-			while(temp.leftChild!=null)
-			{
-				if(temp.leftChild.data==-1)
-				{
-					if(temp.rightChild==null)
-					{
-						break;	//found leaf
-					}
-					if(temp.rightChild.data==-1)
-					{
-						break;	//found leaf
-					}
-					temp = temp.rightChild;
-					continue;
-				}
-				temp = temp.leftChild;
-			}
-			//Stage 1 of removal.
-			temp.lock();
-				itr.leftChild.lock();
-					//validate that it is still a leaf of the tree and the left child-to-be is not marked for removal and the node to be removed hasnt already undergone stage 1 removal.
-					if(temp.data==-1||itr.leftChild.data==-1||itr.r1==true)
-					{
-						temp.unlock();
-						itr.leftChild.unlock();
-						continue;
-					}
-					//add links
-					temp.leftChild = itr.leftChild;
-					itr.leftChild.parent = temp;
-					itr.r1 = true;
-				itr.leftChild.unlock();
-			temp.unlock();
-			//Stage 2 of removal
-			while(true)
-			{
-				parent = itr.parent;
-				parent.lock();
-					if(parent.data==-1||parent.r1==true)	//parent is going to be or has been removed.
-					{
+						itr.unlock();
 						parent.unlock();
-						continue;
+						return true;
 					}
-					itr.lock();
-						if(parent.leftChild==itr)
-						{
-							parent.leftChild = itr.rightChild;
-						}
+					else if(itr.rightChild==null)
+					{
+						if(parent.leftChild == itr)
+							parent.leftChild = itr.leftChild;
+						else if(parent.rightChild == itr)
+							parent.rightChild = itr.leftChild;
 						else
+						{
+							itr.unlock();
+							parent.unlock();
+							return false;
+						}
+						itr.unlock();
+						parent.unlock();
+						return true;	
+					}
+					else if(itr.leftChild==null)
+					{
+						if(parent.leftChild == itr)
+							parent.leftChild = itr.rightChild;
+						else if(parent.rightChild == itr)
+							parent.rightChild = itr.rightChild;
+						else
+						{
+							itr.unlock();
+							parent.unlock();
+							return false;
+						}
+						itr.unlock();
+						parent.unlock();
+						return true;
+					}
+				itr.unlock();
+				parent.unlock();
+				Node temp = itr.rightChild;
+				while(true)
+				{
+					if(temp==null)
+					{
+						return false;
+					}
+					if(temp.leftChild!=null)
+					{
+						temp = temp.leftChild;
+					}
+					else
+					{
+						//stage 1 removal.
+						temp.lock();
+							if(itr.r1.get()==true)
+							{	
+								temp.unlock();
+								return false;
+							}
+							if(temp.leftChild!=null)
+							{
+								temp.unlock();
+								continue;
+								//return false;
+							}
+							itr.r1.set(true);
+							temp.leftChild = itr.leftChild;
+						temp.unlock();
+						break;
+					}
+				}
+				//stage 2 removal.
+				parent.lock();
+				itr.lock();
+						if(parent.rightChild==itr)
 						{
 							parent.rightChild = itr.rightChild;
+							itr.unlock();
+							parent.unlock();
+							return true;
 						}
-						itr.data=-1;
-						itr.rightChild.parent = parent;
-					itr.unlock();
-				parent.unlock();
-			}
+						else if(parent.leftChild==itr)
+						{
+							parent.leftChild = itr.rightChild;
+							itr.unlock();
+							parent.unlock();
+							return true;
+						}
+						else
+						{
+							itr.unlock();
+							parent.unlock();
+							parent = root;
+							itr = root;
+							inner:while(true)
+							{
+								if(itr == null)
+								{
+									return false;
+								}
+								else if(data>itr.data)
+								{
+									parent = itr;
+									itr = itr.rightChild;
+								}
+								else if(data<itr.data)
+								{
+									parent = itr;
+									itr = itr.leftChild;
+								}
+								else
+								{
+									parent.lock();
+									itr.lock();
+									if(parent.rightChild==itr)
+									{
+										parent.rightChild = itr.rightChild;
+										itr.unlock();
+										parent.unlock();
+										return true;
+									}
+									else if(parent.leftChild==itr)
+									{
+										parent.leftChild = itr.rightChild;
+										itr.unlock();
+										parent.unlock();
+										return true;
+									}
+									else
+									{
+										itr.unlock();
+										parent.unlock();
+										/*parent = root;
+										itr = root;
+										continue inner;*/
+										return false;
+									}
+								}
+							}
+						}
 		}
 	}
 	public void print()
 	{
-		rLock.lock();
 		printActual(root);
-		rLock.unlock();
 	}
+	int counter = 0;
 	private void printActual(Node n)
 	{
-		if(n!=null)
-		{
-			printActual(n.leftChild);
-			printActual(n.rightChild);
-			System.out.println(n.data);
+		try{
+			counter++;
+			if(n==root)
+			{
+				counter = 0;
+				System.out.println(n.data);
+				if(n.leftChild!=null&&n.rightChild!=null)
+				{
+					System.out.print(n.leftChild.data+" "+n.rightChild.data);
+					System.out.println();
+					printActual(n.leftChild);
+					printActual(n.rightChild);
+				}
+				else if(n.leftChild!=null)
+				{
+					System.out.println(n.leftChild.data+" null");
+					printActual(n.leftChild);
+				}
+				else if(n.rightChild!=null)
+				{
+					System.out.println("null "+n.rightChild.data);
+					printActual(n.rightChild);
+				}
+			}
+			else if(counter>100)
+				return;
+			else
+			{
+				if(n.r1.get()==true)
+				{
+					System.out.print("parent is "+n.data+"\t");
+					System.out.print(n.leftChild.data+" "+n.rightChild.data);
+					System.out.println();
+					printActual(n.rightChild);
+				}
+				else if(n.leftChild!=null&&n.rightChild!=null)
+				{
+					System.out.print("parent is "+n.data+"\t");
+					System.out.print(n.leftChild.data+" "+n.rightChild.data);
+					System.out.println();
+					printActual(n.leftChild);
+					printActual(n.rightChild);
+				}
+				else if(n.leftChild!=null)
+				{
+					System.out.print("parent is "+n.data+"\t");
+					System.out.print(n.leftChild.data+" null\n");
+					printActual(n.leftChild);
+				}
+				else if(n.rightChild!=null)
+				{
+					System.out.print("parent is "+n.data+"\t");
+					System.out.print("null "+n.rightChild.data);
+					System.out.println();
+					printActual(n.rightChild);
+				}
+			}
 		}
-		else
-			System.out.println(0);
+		catch(NullPointerException e)
+		{
+			return;
+		}
 	}
 }
 
 class Node
 {
-	private ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+	private Lock lock;
 	public volatile Node leftChild;
 	public volatile Node rightChild;
-	public volatile Node parent;
 	public volatile int data;
-	public volatile boolean r1;
+	public AtomicBoolean r1;
 	/* r1 is marked true when the node has undergone stage 1 removal.
 	*  data is set to -1 iff node has undergone stage 2 removal. Important for find operations.
 	*/
@@ -358,8 +411,8 @@ class Node
 		data = -1;
 		leftChild = null;
 		rightChild = null;
-		parent = null;
-		r1 = false;
+		r1 = new AtomicBoolean();
+		lock = new ReentrantLock();
 	}
 	public void lock()
 	{
