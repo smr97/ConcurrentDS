@@ -1,26 +1,28 @@
 import java.lang.*;
 import java.util.*;
+import java.util.concurrent.locks.*;
 
 public class TempDriver
 {
+    public static Lock printl = new ReentrantLock();
 	public static void main(String ar[])
 	{
         Random r = new Random(100);
-		HashTable ht = new HashTable();
-		AddThread[] atArr = new AddThread[400];
-		for(int i = 0; i<400; i++)
+		BinarySearchTree bst = new BinarySearchTree();
+		AddThread[] atArr = new AddThread[100];
+		for(int i = 0; i<3; i++)
 		{
-			atArr[i] = new AddThread(i, ht);
+			atArr[i] = new AddThread(i, bst);
 			atArr[i].start();
 		}
-        RemoveThread[] rtArr = new RemoveThread[400];
-        for(int i = 0; i<400; i++)
+        RemoveThread[] rtArr = new RemoveThread[100];
+        for(int i = 0; i<3; i++)
         {
-            rtArr[i] = new RemoveThread(i, ht);
+            rtArr[i] = new RemoveThread(i, bst);
             rtArr[i].start();
         }
-        PrintThread pt = new PrintThread(ht);
-        pt.start();
+        PrintThread pt = new PrintThread(bst);
+        //pt.start();
         /*for(int i = 0; i<20; i++)
         {
             if(i%5==2)
@@ -36,10 +38,10 @@ public class TempDriver
 
 class PrintThread extends Thread
 {
-    private HashTable ht;
-    public PrintThread(HashTable ht)
+    private BinarySearchTree bst;
+    public PrintThread(BinarySearchTree bst)
     {
-        this.ht = ht;
+        this.bst = bst;
     }
     public void run()
     {
@@ -47,9 +49,10 @@ class PrintThread extends Thread
         {
             while(true)
             {
-                ht.printTable();
-                System.out.println();
-                Thread.sleep(50);
+                bst.print();
+                System.out.flush();
+                System.out.println("\n");
+                Thread.sleep(80);
             }
         }
         catch(InterruptedException ie){}
@@ -59,57 +62,85 @@ class PrintThread extends Thread
 class AddThread extends Thread
 {
     private int id;
-    private HashTable hT;
+    private BinarySearchTree bst;
     private int counter = 0;
-    AddThread(int i, HashTable hT)
+    Random r = new Random(100);
+    AddThread(int i, BinarySearchTree bst)
     {
         this.id = i;
-        this.hT = hT;
+        this.bst = bst;
     }
     public void run()
     {
-        Random r = new Random(1000);
-        try
+        Random r = new Random();
+        //try
         {
             while(true)
             {
-                if(hT.insert(id+counter++))
-				    ;//System.out.println("thread "+Thread.currentThread().getId()+" inserted "+ (id+counter-1));
+                if(bst.insert(id+counter++))
+				{
+                    //System.out.println("thread "+Thread.currentThread().getId()+" INSERTED "+ (id+counter-1));
+                    //TempDriver.printl.lock();
+                    //bst.print();
+                    //System.out.flush();
+                    //System.out.println("\n");
+                    //TempDriver.printl.unlock();
+                }
                 else
-                    ;//System.out.println("thread "+Thread.currentThread().getId()+" DIDN'T insert "+ (id+counter-1));
-                Thread.sleep(r.nextInt(90));
+                {
+                    //TempDriver.printl.lock();
+                    //System.out.println("thread "+Thread.currentThread().getId()+" DIDN'T insert "+ (id+counter-1));
+                    //System.out.flush();
+                    //TempDriver.printl.unlock();*/
+                }
+                counter = r.nextInt(10000)%100;
+                //Thread.sleep(r.nextInt(50));
         	}
         }
-        catch(InterruptedException e){}
+        //catch(InterruptedException e){}
     }
 }
 
 class RemoveThread extends Thread
 {
     private int id;
-    private HashTable hT;
+    private BinarySearchTree bst;
     private int counter = 0;
-    RemoveThread(int i, HashTable hT)
+    Random r = new Random(100);
+    RemoveThread(int i, BinarySearchTree bst)
     {
         this.id = i;
-        this.hT = hT;
+        this.bst = bst;
     }
     public void run()
     {
-        Random r = new Random(1000);
-        try
+        Random r = new Random();
+        //try
         {
             while(true)
             {
-                if(!(hT.remove(id+counter-1))&&(id+counter-1>0))
+                if(!(bst.remove(id+counter-1))||(id+counter-1<=0))
                 {
-                    //System.out.println("thread "+Thread.currentThread().getId()+" DIDNT'T remove "+(counter-1));
+                    //TempDriver.printl.lock();
+                    //System.out.println("thread "+Thread.currentThread().getId()+" DIDNT'T remove "+(id+counter-1));
+                    //System.out.flush();
+                    //TempDriver.printl.unlock();*/
+                    //System.out.println("\n");
                 }
                 else
-                    counter++;//System.out.println("thread "+Thread.currentThread().getId()+" removed "+(id+counter-1));
-                Thread.sleep(r.nextInt(100));
+                    {
+                        System.out.println("thread "+Thread.currentThread().getId()+" REMOVED "+(id+counter-1));
+                        //System.out.flush();
+                        //TempDriver.printl.lock();
+                        //bst.print();
+                        //System.out.flush();
+                        //System.out.println("\n");
+                        //TempDriver.printl.unlock();
+                    }
+                counter = r.nextInt(10000)%100;
+                //Thread.sleep(r.nextInt(100));
             }
         }
-        catch(InterruptedException e){}
+        //catch(InterruptedException e){}
     }
 }
